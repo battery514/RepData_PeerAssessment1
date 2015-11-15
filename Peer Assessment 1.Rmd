@@ -1,0 +1,102 @@
+---
+title: 'Reproducible Research: Peer Assessment 1'
+author: "Chris Hervochon"
+date: "Sunday, November 15, 2015"
+output: html_document
+---
+
+#Set the working directory
+```{r}
+require(knitr)
+opts_knit$set(root.dir = 'c:/Users/Herv/My Documents')
+```
+
+#Load and preprocess the data
+```{r}
+df <- read.csv("activity.csv")
+df$date <- as.Date(df$date)
+```
+
+Now we examine the mean total number of steps taken per day by means of a histogram
+```{r}
+library(ggplot2)
+TotalStepsDay <- aggregate(x = df$steps , by = list(df$date), FUN = sum ,na.rm=TRUE)
+names(TotalStepsDay) <- c("date","steps")
+histplot <- ggplot(TotalStepsDay,aes(x = steps)) +
+            ggtitle("Histogram of daily steps") +
+            xlab("Steps (binwidth 2000)") +
+            geom_histogram(binwidth = 2000)
+histplot
+```
+
+The mean number of steps by day is calculated as:
+```{r}
+mean(TotalStepsDay$steps , na.rm = TRUE)
+```
+
+The median number of steps by day is calculated as:
+```{r}
+median(TotalStepsDay$steps , na.rm = TRUE)
+```
+
+Time series plot of 5-minute interval and the average number of steps taken, averaged across all days:
+```{r}
+AverageSteps  <- aggregate(x = df$steps , by = list(df$interval), FUN = mean ,na.rm=TRUE)
+names(AverageSteps) <- c("interval","steps")
+
+avg.step.line <- ggplot(AverageSteps,aes(interval,steps)) +
+                 ggtitle("Time Series Plot of Average Steps by Interval") +
+                 geom_line()
+avg.step.line  
+
+AverageSteps[which.max(AverageSteps$steps),c("interval")]
+```
+
+#Imputing missing values
+
+```{r}
+nrow(df[is.na(df$steps),])
+
+df.imputed <- merge(x = df, y = AverageSteps, by = "interval", all.x = TRUE)
+df.imputed[is.na(df.imputed$steps.x),c("steps.x")] <- df.imputed[is.na(df.imputed$steps.x),c("steps.y")]
+
+df.imputed$date <- as.Date(df.imputed$date)
+df.imputed$date.x <- NULL
+df.imputed$Group.1 <- NULL
+df.imputed$steps <- df.imputed$steps.x
+df.imputed$steps.x <- NULL
+df.imputed$steps.y <- NULL
+
+TotalStepsDay <- aggregate(x = df.imputed$steps , by = list(df.imputed$date), FUN = sum ,na.rm=TRUE)
+names(TotalStepsDay) <- c("date","steps")
+histplot <- ggplot(TotalStepsDay,aes(x = steps)) +
+            ggtitle("Histogram of daily steps after imputation") +
+            xlab("Steps (binwidth 2000)") +
+            geom_histogram(binwidth = 2000)
+histplot 
+
+mean(TotalStepsDay$steps , na.rm = TRUE)
+median(TotalStepsDay$steps , na.rm = TRUE)
+```
+
+###Do these values differ from the estimates from the first part of the assignment? 
+No, the values are the same.
+
+###What is the impact of imputing missing data on the estimates of the total daily number of steps?
+There is very little, if any, impact.
+
+###Are there differences in activity patterns between weekdays and weekends?
+Yes, the patterns are different, per the below.
+```{r}
+df.imputed$weekday <- as.factor(ifelse(weekdays(df.imputed$date) %in% c("Saturday","Sunday"), "Weekend", "Weekday")) 
+
+AverageSteps.and.weekday  <- aggregate(x = df.imputed$steps , 
+                                                    by = list(df.imputed$interval,df.imputed$weekday), FUN = mean ,na.rm=TRUE)
+names(AverageSteps.and.weekday) <- c("interval","weekday","steps")
+
+avg.step.line <- ggplot(AverageSteps.and.weekday,aes(interval,steps)) +
+                 ggtitle("Time Series Plot of Average Steps by Interval after Imputation") +
+                 facet_grid(. ~ weekday) +
+                 geom_line(size = 1)
+avg.step.line  
+```
